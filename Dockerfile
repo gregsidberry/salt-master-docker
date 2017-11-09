@@ -31,7 +31,7 @@ RUN apt-get install -y openssh-server salt-master ntp salt-ssh salt-cloud
 #SEC / Will work on later (harden ssh, user)
 
 #todo - fix permissons
-RUN mkdir -p /var/run/sshd
+#RUN mkdir -p /var/run/sshd
 
 #add admin user
 RUN useradd -ms /bin/bash  admin
@@ -43,6 +43,8 @@ RUN echo "admin:password" | chpasswd
 #Downgrade from root user
 #USER admin
 
+#todo - config ssh, sudo, firehol
+#RUN apt-get install -y sudo firehol
 
 #Expose Salt Master ports
 EXPOSE 4505 4506

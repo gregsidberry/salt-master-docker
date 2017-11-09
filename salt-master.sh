@@ -7,11 +7,10 @@ ELSM_DOCKER_PORTS=("4505:4505" "4506:4506")
 ###If you edit the binds list, make sure they match per array
 ### ex: "~/foo" added to _FROM array, so "/foo" added to _TO array
 ELSM_DOCKER_BINDS_FROM=("$HOME/Desktop/DevOps/servers/salt-master/etc" "$HOME/Desktop/DevOps/servers/salt-master/srv" "$HOME/Desktop/DevOps/servers/salt-master/log" )
-ELSM_DOCKER_BINDS_TO=("/etc/salt" "/srv" "/var/log")
+ELSM_DOCKER_BINDS_TO=("/etc/salt" "/srv/salt" "/var/log")
 
-
+###Nothing to see here, DON'T PANIC
 ELSM_DOCKER_CMD=`which docker`
-
 
 check_docker(){
     if [ -z ${ELSM_DOCKER_CMD} ]
@@ -20,6 +19,7 @@ check_docker(){
         exit 0
     fi
     
+    
     test_docker=`${ELSM_DOCKER_CMD} -v`
     if [[ $test_docker =~ "not" ]]
     then
@@ -27,7 +27,8 @@ check_docker(){
         exit 0;
     fi
     
-    echo "Docker tested. Result: ${test_docker}"
+    
+    echo "Docker found: ${test_docker}"
 
 } 
 
@@ -35,24 +36,49 @@ check_docker(){
 start_master(){
     start_docker="${ELSM_DOCKER_CMD} start ${ELSM_DOCKER_NAME}"
     start_result=`${start_docker}`
-    if [[ $start_result =~ "No such container" ]]
+    
+    if [[ "$start_result" =~ "No such container" ]]
     then
-        echo "Container not found, please use: ${0} build and update this script\n Result: {$start_result}"
+        echo "Container not found, please use: ${0} build and or update this script"
+        echo "Docker Result: {$start_result}"
         exit 0;
+    
     fi
     
-    echo "Docker started. Result: ${start_result}"
-    exit 1;        
+    
+    if [[ -z "$start_result" ]]
+    then
+        echo "Container not found, please use: ${0} build and / or update this script"
+        exit 0;
+    
+    fi
+    
+    
+    if [ "${start_result}" == "${ELSM_DOCKER_NAME}" ]; then 
+        echo "${ELSM_DOCKER_NAME} started!"
+        return 1;
+    fi
+    
+    
+    echo "Docker Result: ${start_result}"       
         
 }
+
 
 stop_master(){
     stop_docker="${ELSM_DOCKER_CMD} stop ${ELSM_DOCKER_NAME}"
     stop_result=`${stop_docker}`
-    echo "Docker stopped. Result: ${stop_result}"
-    exit 1;
-
+    
+    if [ "${stop_result}" == "${ELSM_DOCKER_NAME}" ]; then 
+        echo "${ELSM_DOCKER_NAME} stopped!"
+        return 1;
+    fi
+    
+    
+    echo "Docker Result: ${stop_result}"
+  
 }
+
 
 build_master(){
     
@@ -63,6 +89,7 @@ build_master(){
     
     done
     
+    
     build_docker+=" --name ${ELSM_DOCKER_NAME} -h ${ELSM_DOCKER_NAME}"
     mount_docker=""
     
@@ -71,31 +98,43 @@ build_master(){
         if [[ -z "${ELSM_DOCKER_BINDS_FROM[$i]}// }" ]]; then 
             continue;
         fi
+        
+        
         if [[ -z "${ELSM_DOCKER_BINDS_TO[$i]}// }" ]]; then 
             continue;
         fi
+        
         
         mount_docker+=" -v ${ELSM_DOCKER_BINDS_FROM[$i]}:${ELSM_DOCKER_BINDS_TO[$i]}"
     
     done
     
+    
     build_docker+=" ${mount_docker} ${ELSM_DOCKER_IMAGE}"
     build_result=`${build_docker}`
+    echo "build cmd: ${build_docker}"
     
-    #on failure outputs regardless
-    #if [[ "${build_result}" =~ "^.*(no such|unable|denied|permission).*$" ]]
-    #then
-    #    echo "Docker build failed. Result: ${build_result}"
-    #    echo "CMD: ${build_docker}"
-    #    exit 0;
+    if [[ "${build_result}" =~ "^.*(no such|unable|denied|permission).*$" ]]
+    then
+        echo "Docker build failed. Result: ${build_result}"
+        echo "CMD: ${build_docker}"
+        exit 0;
         
-    #fi
+    fi
     
-    echo "Any Docker errors appear above. New container id: '${build_result}'"
-    echo "CMD: ${build_docker}" 
-    exit 1;
+    
+    if [ ! -z "${build_result}" ]; then 
+        echo "${ELSM_DOCKER_NAME} built!"
+        echo "New container id: '${build_result}'"
+        return 1;
+        
+    fi
+    
+    
+    echo "Any build errors appear above."
 
 }
+
 
 mkdir_master(){
     for i in "${ELSM_DOCKER_BINDS_FROM[@]}"
@@ -104,11 +143,13 @@ mkdir_master(){
             continue;
         fi
             
-        echo "making dir ${i}"
+        #echo "making dir ${i}"
         mk_result=`mkdir -p "${i}"`
     done
 
+
 }
+
 
 purge_master(){
     #remove master and all exited containers
@@ -123,49 +164,65 @@ purge_master(){
         purged+=`docker rm ${k}`
            
     done
+    
+    
 }
+
 
 check_docker;
 mkdir_master;
-
+echo "---Progress / Errors---"
 case "$1" in 
     start)   
-        echo "start" 
+        echo "starting..." 
         start_master;
+        exit 1;
         
     ;;
+    
     
     stop)    
-        echo "stop" 
+        echo "stopping..." 
         stop_master;
+        exit 1;
     
     ;;
+    
     
     restart) 
-        echo "restart" 
+        echo "restarting..." 
         stop_master; 
         start_master;
-        
+        exit 1;
+    
     ;;
+    
     
     build)
-        echo "build"
-        build_master;  
+        echo "building..."
+        build_master; 
+        echo "starting ..."
+        start_master;
+        exit 1; 
         
     ;;
     
+    
     purge)
-        echo "purge"
+        echo "the purge has began..."
+        stop_master;
         purge_master;
-        
+        exit 1;
+    
     ;;
+    
     
     *)
         echo "Usage: $0 start|stop|restart|build|purge"
-        echo "must edit config items ELSM_DOCKER_IMAGE and ELSM_DOCKER_FILE in script to use"
+        echo "must edit config items ELSM_DOCKER_IMAGE and ELSM_DOCKER_FILEDIR in script to use"
         echo "purge will delete all exited containers (use with caution)"
-        exit 1
+        exit 1;
+    
         
 esac
-#exit 0
-
+exit 0
