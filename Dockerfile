@@ -11,7 +11,7 @@ RUN apt-get install -y apt-transport-https ca-certificates curl software-propert
 RUN curl -k -ssl https://repo.saltstack.com/apt/ubuntu/16.04/amd64/latest/SALTSTACK-GPG-KEY.pub | apt-key add -
 
 #add repo
-RUN add-apt-repository "deb http://repo.saltstack.com/apt/ubuntu/16.04/amd64/latest xenial main"
+RUN add-apt-repository "deb [arch=amd64] http://repo.saltstack.com/apt/ubuntu/16.04/amd64/latest xenial main"
 
 #update
 RUN apt-get update
@@ -27,11 +27,13 @@ RUN dpkg -i dumb-init_*.deb
 
 #install
 RUN apt-get install -y openssh-server salt-master ntp salt-ssh salt-cloud
+RUN mkdir -p /srv/salt /var/log 
 
 #SEC / Will work on later (harden ssh, user)
 
 #todo - fix permissons
-#RUN mkdir -p /var/run/sshd
+#RUN mkdir -p /var/run/sshd 
+
 
 #add admin user
 RUN useradd -ms /bin/bash  admin
@@ -44,11 +46,11 @@ RUN echo "admin:password" | chpasswd
 #USER admin
 
 #todo - config ssh, sudo, firehol
-#RUN apt-get install -y sudo firehol
+#RUN apt-get install -y sudo firehol nmap
 
 #Expose Salt Master ports
 EXPOSE 4505 4506
 
-
-CMD ["dumb-init","/usr/bin/salt-master" ]  
+#Do not run as daemon "-d"
+CMD ["dumb-init","/usr/bin/salt-master"]  
 

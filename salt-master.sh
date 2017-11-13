@@ -1,12 +1,12 @@
 #!/bin/bash
 
-ELSM_DOCKER_IMAGE="a2f03f6d5c5a"
-ELSM_DOCKER_FILE="."
+ELSM_DOCKER_IMAGE="65bdfabdddd6"
+ELSM_DOCKER_HOME="$HOME/Desktop/DevOps/servers/salt-master"
 ELSM_DOCKER_NAME="salt-master-elsm"
 ELSM_DOCKER_PORTS=("4505:4505" "4506:4506")
 ###If you edit the binds list, make sure they match per array
 ### ex: "~/foo" added to _FROM array, so "/foo" added to _TO array
-ELSM_DOCKER_BINDS_FROM=("$HOME/Desktop/DevOps/servers/salt-master/etc" "$HOME/Desktop/DevOps/servers/salt-master/srv" "$HOME/Desktop/DevOps/servers/salt-master/log" )
+ELSM_DOCKER_BINDS_FROM=("${ELSM_DOCKER_HOME}/etc" "${ELSM_DOCKER_HOME}/srv" "${ELSM_DOCKER_HOME}/log" )
 ELSM_DOCKER_BINDS_TO=("/etc/salt" "/srv/salt" "/var/log")
 
 ###Nothing to see here, DON'T PANIC
@@ -68,6 +68,8 @@ start_master(){
 stop_master(){
     stop_docker="${ELSM_DOCKER_CMD} stop ${ELSM_DOCKER_NAME}"
     stop_result=`${stop_docker}`
+    kill_docker="${ELSM_DOCKER_CMD} kill ${ELSM_DOCKER_NAME}"
+    kill_result=`${kill_docker}`
     
     if [ "${stop_result}" == "${ELSM_DOCKER_NAME}" ]; then 
         echo "${ELSM_DOCKER_NAME} stopped!"
@@ -85,6 +87,11 @@ build_master(){
     build_docker="${ELSM_DOCKER_CMD} create"
     for p in "${ELSM_DOCKER_PORTS[@]}"
     do 
+        if [[ -z "${p}// }" ]]; then 
+            continue;
+        fi
+        
+        
         build_docker+=" -p ${p}"
     
     done
@@ -156,16 +163,49 @@ purge_master(){
     old_dockers=`docker ps -aq -f status=exited`
     purge_dockers=($old_dockers)
     purged=`docker kill ${ELSM_DOCKER_NAME}`
-    purged+=`docker rm ${ELSM_DOCKER_NAME}`
+    purged+=`docker rm -f ${ELSM_DOCKER_NAME}`
     
+    if [ "${purged}" == "${ELSM_DOCKER_NAME}" ]; then 
+        echo "${ELSM_DOCKER_NAME} purged!"
+        
+    fi
+    
+    
+    #comment here if you what to stop exited container pruning
     for k in "${purge_dockers[@]}"
     do
-        purged+=`docker kill -f ${k}`
-        purged+=`docker rm ${k}`
+        purged+=`docker kill ${k}`
+        purged+=`docker rm -f ${k}`
+        echo "${k} purged"
            
     done
+    #end
+ 
     
+    echo "the purge has ended, emergency services restored"
+    echo "Purge Results: ${purged}"
     
+}
+
+patch_host(){
+    #prep
+    apt-get update
+    apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+
+    #add key
+    curl -k -ssl https://repo.saltstack.com/apt/ubuntu/16.04/amd64/latest/SALTSTACK-GPG-KEY.pub | apt-key add -
+    curl -k -ssl https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    
+    #add repo
+    add-apt-repository "deb [arch=amd64] http://repo.saltstack.com/apt/ubuntu/16.04/amd64/latest xenial main"
+    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"
+    
+    #update
+    apt-get update
+    
+    #install 
+    apt-get install -y salt-minion salt-common salt-ssh docker-ce
+
 }
 
 
@@ -217,10 +257,20 @@ case "$1" in
     ;;
     
     
+    patch)
+        echo "Installing salt and docker..."
+        patch_host;
+        exit 1;
+        
+        
+    ;;
+    
+    
     *)
-        echo "Usage: $0 start|stop|restart|build|purge"
+        echo "Usage: $0 start|stop|restart|build|purge|patch"
         echo "must edit config items ELSM_DOCKER_IMAGE and ELSM_DOCKER_FILEDIR in script to use"
         echo "purge will delete all exited containers (use with caution)"
+        echo "patch will attempt to install salt and docker repo's and packages"
         exit 1;
     
         

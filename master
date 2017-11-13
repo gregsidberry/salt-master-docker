@@ -1,0 +1,17 @@
+#user: admin
+keysize: 4096
+hash_type: sha512
+file_roots:
+    base:
+        - /srv/salt
+    sertpi:
+        -/srv/salt/sertpi
+    webdev:
+        - /srv/salt/webdev
+    openstack:
+        -/srv/salt/openstack
+        
+pillar_roots:
+    base:
+        - /srv/pillar
+
